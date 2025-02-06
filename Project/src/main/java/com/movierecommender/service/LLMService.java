@@ -9,11 +9,43 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.util.Set;
+import java.util.HashMap;
+import java.util.Map;
 
 public class LLMService {
     private static final String OLLAMA_URL = "http://127.0.0.3:11434/api/generate";
     private final ObjectMapper objectMapper = new ObjectMapper();
     private static final Logger logger = LoggerFactory.getLogger(LLMService.class);
+
+    // Define valid genres as a Set for validation
+    private static final Set<String> VALID_GENRES = Set.of(
+            "Action", "Adventure", "Animation", "Children's", "Comedy", "Crime",
+            "Documentary", "Drama", "Fantasy", "Film-Noir", "Horror", "Musical",
+            "Mystery", "Romance", "Sci-Fi", "Thriller", "War", "Western"
+    );
+
+    // Define a map to fix common genre fragments
+    private static final Map<String, String> GENRE_FIX_MAP = new HashMap<>();
+    static {
+        GENRE_FIX_MAP.put("sci", "Sci-Fi");
+        GENRE_FIX_MAP.put("fi", "Sci-Fi");
+        GENRE_FIX_MAP.put("dr", "Drama");
+        GENRE_FIX_MAP.put("com", "Comedy");
+        GENRE_FIX_MAP.put("advent", "Adventure");
+        GENRE_FIX_MAP.put("an", "Animation");
+        GENRE_FIX_MAP.put("mus", "Musical");
+        GENRE_FIX_MAP.put("myst", "Mystery");
+        GENRE_FIX_MAP.put("hor", "Horror");
+        GENRE_FIX_MAP.put("act", "Action");
+        GENRE_FIX_MAP.put("children", "Children's");
+        GENRE_FIX_MAP.put("document", "Documentary");
+        GENRE_FIX_MAP.put("fant", "Fantasy");
+        GENRE_FIX_MAP.put("rom", "Romance");
+        GENRE_FIX_MAP.put("th", "Thriller");
+
+
+    }
 
     public String extractGenreFromQuery(String userQuery) throws Exception {
         // Escape quotes in the user query for safety
@@ -21,7 +53,10 @@ public class LLMService {
 
         String prompt = String.format(
                 "{\"model\": \"mistral\", \"prompt\": \"%s\", \"system\": " +
-                        "\"You are a movie AI agent to help suggest movie. Use this knowledge: Genres are :Chose between Action,Adventure, Animation, Children's, Comedy, Crime, Documentary, Drama , Fantasy, Film-Noir, Horror, Musical, Mystery, Romance,Sci-Fi,Thriller,War and Western. Extract the primary movie genre that is more likely from the user query. Respond only with the genre name with out additional information.\"}",
+                        "\"You are a movie AI agent that suggests movies. Use this knowledge: Genres are: " +
+                        "Action, Adventure, Animation, Children's, Comedy, Crime, Documentary, Drama, " +
+                        "Fantasy, Film-Noir, Horror, Musical, Mystery, Romance, Sci-Fi, Thriller, War, and Western. " +
+                        "Extract the primary movie genre from the user query. Respond ONLY with the genre name, nothing else.\"}",
                 safeQuery
         );
 
@@ -32,22 +67,24 @@ public class LLMService {
 
             // Execute the request and get the response
             String response = EntityUtils.toString(client.execute(post).getEntity());
-            logger.debug("Raw API Response: {}", response); // Logging raw response
+            logger.debug("Raw API Response: {}", response);
 
             // Parse the JSON response
             JsonNode root = objectMapper.readTree(response);
-
-            // Log the parsed response
             logger.debug("Parsed JSON Response: {}", root);
 
-            // Check if the "response" field exists
             if (root.has("response")) {
                 String genre = root.get("response").asText().trim();
 
-                // Handle the issue of fragmented genres like "Sci" and "Fi"
-                genre = mergeFragmentedGenres(genre);
+                // Normalize and correct genre
+                genre = fixGenre(genre);
 
-                logger.debug("Processed Genre: {}", genre); // Log the final genre
+                if (!VALID_GENRES.contains(genre)) {
+                    logger.warn("Invalid genre detected: {}. Returning default 'Drama'", genre);
+                    return "Drama";  // Default fallback
+                }
+
+                logger.debug("Processed Genre: {}", genre);
                 return genre;
             } else {
                 logger.error("Invalid API response: 'response' field not found. Full response: {}", response);
@@ -59,16 +96,15 @@ public class LLMService {
         }
     }
 
-    // Helper method to merge fragmented genres (e.g., "Sci" + "Fi" -> "Sci-Fi")
-    private String mergeFragmentedGenres(String genre) {
-        if (genre.equalsIgnoreCase("Sci") || genre.equalsIgnoreCase("Fi")) {
-            return "Sci-Fi"; // Combining the fragments
-        }
-        else if (genre.equalsIgnoreCase("Dr") ) {
-            return "Drama";
-        }
+    // Fix fragmented or incorrect genre names
+    private String fixGenre(String genre) {
+        genre = genre.trim().toLowerCase();
+        return GENRE_FIX_MAP.getOrDefault(genre, capitalize(genre));
+    }
 
-        // Add more logic here for other possible fragments if needed
-        return genre; // Return as-is if no merging needed
+    // Capitalize first letter (e.g., "drama" -> "Drama")
+    private String capitalize(String genre) {
+        if (genre.isEmpty()) return genre;
+        return genre.substring(0, 1).toUpperCase() + genre.substring(1);
     }
 }
