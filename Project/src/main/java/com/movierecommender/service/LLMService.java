@@ -21,7 +21,7 @@ public class LLMService {
 
         String prompt = String.format(
                 "{\"model\": \"mistral\", \"prompt\": \"%s\", \"system\": " +
-                        "\"Extract the primary movie genre from the user query. Respond only with the genre name.\"}",
+                        "\"You are a movie AI agent to help suggest movie. Use this knowledge: Genres are :Chose between Action,Adventure, Animation, Children's, Comedy, Crime, Documentary, Drama , Fantasy, Film-Noir, Horror, Musical, Mystery, Romance,Sci-Fi,Thriller,War and Western. Extract the primary movie genre from the user query. Respond only with the genre name.\"}",
                 safeQuery
         );
 
@@ -42,7 +42,13 @@ public class LLMService {
 
             // Check if the "response" field exists
             if (root.has("response")) {
-                return root.get("response").asText().trim();
+                String genre = root.get("response").asText().trim();
+
+                // Handle the issue of fragmented genres like "Sci" and "Fi"
+                genre = mergeFragmentedGenres(genre);
+
+                logger.debug("Processed Genre: {}", genre); // Log the final genre
+                return genre;
             } else {
                 logger.error("Invalid API response: 'response' field not found. Full response: {}", response);
                 throw new RuntimeException("Invalid API response: 'response' field not found");
@@ -51,5 +57,18 @@ public class LLMService {
             logger.error("Error during genre extraction", e);
             throw new RuntimeException("Failed to extract genre from query", e);
         }
+    }
+
+    // Helper method to merge fragmented genres (e.g., "Sci" + "Fi" -> "Sci-Fi")
+    private String mergeFragmentedGenres(String genre) {
+        if (genre.equalsIgnoreCase("Sci") || genre.equalsIgnoreCase("Fi")) {
+            return "Sci-Fi"; // Combining the fragments
+        }
+        else if (genre.equalsIgnoreCase("Dr") ) {
+            return "Drama";
+        }
+
+        // Add more logic here for other possible fragments if needed
+        return genre; // Return as-is if no merging needed
     }
 }
