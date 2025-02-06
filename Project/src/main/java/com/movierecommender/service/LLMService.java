@@ -21,7 +21,7 @@ public class LLMService {
 
         String prompt = String.format(
                 "{\"model\": \"mistral\", \"prompt\": \"%s\", \"system\": " +
-                        "\"You are a movie AI agent to help suggest movie. Use this knowledge: Genres are :Chose between Action,Adventure, Animation, Children's, Comedy, Crime, Documentary, Drama , Fantasy, Film-Noir, Horror, Musical, Mystery, Romance,Sci-Fi,Thriller,War and Western. Extract the primary movie genre from the user query. Respond only with the genre name.\"}",
+                        "\"You are a movie AI agent to help suggest movie. Use this knowledge: Genres are :Chose between Action,Adventure, Animation, Children's, Comedy, Crime, Documentary, Drama , Fantasy, Film-Noir, Horror, Musical, Mystery, Romance,Sci-Fi,Thriller,War and Western. Extract the primary movie genre that is more likely from the user query. Respond only with the genre name with out additional information.\"}",
                 safeQuery
         );
 
